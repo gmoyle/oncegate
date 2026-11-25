@@ -1,0 +1,16 @@
+# OnceGate in front of an app, behind your own reverse proxy (Caddy, Traefik, nginx...)
+# that already terminates HTTPS. Point the proxy's public site at oncegate:9099.
+services:
+  oncegate:
+    image: ghcr.io/gmoyle/oncegate:latest
+    environment:
+      ONCEGATE_UPSTREAM: http://myapp:8080
+      ONCEGATE_PUBLIC_URL: https://guests.example.com
+      ONCEGATE_TITLE: My home server
+    ports:
+      - "127.0.0.1:9099:9099"     # your reverse proxy connects here
+      - "9098:9098"                # admin page: keep it off the internet
+    volumes:
+      - ./data:/data
+      - ./secrets:/secrets:ro
+    restart: unless-stopped

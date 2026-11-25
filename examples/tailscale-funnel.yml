@@ -1,0 +1,42 @@
+# OnceGate + Tailscale Funnel: a free public https:// address with no open router ports.
+#
+#   1. In the Tailscale admin console: DNS -> enable MagicDNS and HTTPS certificates,
+#      and make sure your policy lets this node use Funnel (nodeAttrs "funnel").
+#   2. Create an auth key (Settings -> Keys) and save it, alone, in ./secrets/ts-authkey
+#   3. Put an admin password (one line, 8+ characters) in ./secrets/admin-password
+#   4. docker compose up -d, then set ONCEGATE_PUBLIC_URL to https://oncegate.<your-tailnet>.ts.net
+#
+# Guests get https://oncegate.<tailnet>.ts.net/_once/<code>. The admin page stays on your LAN at :9098.
+services:
+  oncegate:
+    image: ghcr.io/gmoyle/oncegate:latest
+    container_name: oncegate
+    network_mode: host                 # so it can reach apps on the host and the sidecar can reach it
+    environment:
+      ONCEGATE_UPSTREAM: http://127.0.0.1:8080      # the app you're protecting
+      ONCEGATE_PUBLIC_URL: https://oncegate.example-tailnet.ts.net
+      ONCEGATE_TITLE: My home server
+      ONCEGATE_SESSION_HOURS: "4"
+    volumes:
+      - ./data:/data
+      - ./secrets:/secrets:ro
+    restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: oncegate-tailscale
+    hostname: oncegate
+    network_mode: host                 # userspace mode: no TUN device, safe beside a host Tailscale
+    environment:
+      TS_AUTHKEY: file:/secrets/ts-authkey
+      TS_HOSTNAME: oncegate
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SOCKET: /tmp/oncegate-tailscaled.sock
+      TS_TAILSCALED_EXTRA_ARGS: --port=41642
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - ./tailscale:/var/lib/tailscale
+      - ./secrets:/secrets:ro
+      - ./serve.json:/config/serve.json:ro
+    restart: unless-stopped

@@ -1,0 +1,43 @@
+# OnceGate on a QNAP NAS (Container Station application), guarding an app on the host at :8088.
+# Public: https://oncegate.<tailnet>.ts.net via Tailscale Funnel. Admin: http://<nas>:9098 (LAN only).
+# Files under /share/Container/oncegate: app/oncegate.py, data/, secrets/admin-password,
+# secrets/ts-authkey (only needed for the first sign-in), serve.json, tailscale/ (state).
+services:
+  oncegate:
+    image: python:3.12-alpine
+    container_name: oncegate
+    command: ["python", "-u", "/app/oncegate.py", "serve"]
+    network_mode: host
+    environment:
+      - ONCEGATE_UPSTREAM=http://127.0.0.1:8088
+      - ONCEGATE_PORT=9099
+      - ONCEGATE_ADMIN_PORT=9098
+      - ONCEGATE_DATA_DIR=/data
+      - ONCEGATE_ADMIN_PASSWORD_FILE=/secrets/admin-password
+      - ONCEGATE_TITLE=My home portal
+      - ONCEGATE_SESSION_HOURS=4
+      - ONCEGATE_PUBLIC_URL=https://oncegate.your-tailnet.ts.net
+    volumes:
+      - /share/Container/oncegate/app:/app:ro
+      - /share/Container/oncegate/data:/data
+      - /share/Container/oncegate/secrets:/secrets:ro
+    restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: oncegate-tailscale
+    hostname: oncegate
+    network_mode: host
+    environment:
+      - TS_AUTHKEY=file:/secrets/ts-authkey
+      - TS_HOSTNAME=oncegate
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SOCKET=/tmp/oncegate-tailscaled.sock
+      - TS_TAILSCALED_EXTRA_ARGS=--port=41642
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - /share/Container/oncegate/tailscale:/var/lib/tailscale
+      - /share/Container/oncegate/secrets:/secrets:ro
+      - /share/Container/oncegate/serve.json:/config/serve.json:ro
+    restart: unless-stopped

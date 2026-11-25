@@ -1,0 +1,7 @@
+# Runtime state and secrets: never commit these
+data/
+secrets/
+tailscale/
+*.pyc
+__pycache__/
+.DS_Store
