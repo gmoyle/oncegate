@@ -2,6 +2,14 @@
 
 All notable changes to OnceGate. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-25
+
+### Added
+
+- **Copy link** button next to a newly created link on the admin page. It works on plain-http home
+  networks, where browsers don't offer the modern clipboard, and falls back to selecting the link.
+  The admin page's Content-Security-Policy allows only that one script, by per-response nonce.
+
 ## [0.1.0] - 2026-11-25
 
 First release.
@@ -23,4 +31,5 @@ First release.
 - Container image (non-root, health check) for amd64, arm64 and armv7.
 - Guides for Tailscale Funnel, reverse proxies, NAS platforms and troubleshooting.
 
+[0.1.1]: https://github.com/gmoyle/oncegate/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gmoyle/oncegate/releases/tag/v0.1.0

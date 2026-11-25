@@ -28,7 +28,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # ----------------------------------------------------------------------------
 # Configuration
@@ -594,6 +594,7 @@ th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .ready{color:var(--ok)}.used,.expired,.revoked{color:var(--muted)}.live{color:var(--ok)}
 .new-link{background:var(--soft);border:2px dashed var(--accent);border-radius:12px;padding:14px;display:grid;gap:8px}
 .new-link code{font-size:.95rem;word-break:break-all;user-select:all}
+.new-link .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.new-link .row .sub{margin:0}
 .empty{color:var(--muted);font-style:italic}
 """
 
@@ -602,6 +603,30 @@ _admin_sessions = {}          # sha256(token) -> expiry; in memory, so a restart
 _admin_lock = threading.Lock()
 ADMIN_COOKIE = "oncegate_admin"
 ADMIN_SESSION_SECONDS = 12 * 3600
+
+
+# Copy button for a new link. The admin page is often plain http on a LAN, where
+# navigator.clipboard isn't available, so fall back to execCommand, then to selecting it.
+ADMIN_JS = """
+(function () {
+  var b = document.getElementById('copylink'); if (!b) return;
+  var code = document.getElementById('newlink'), note = document.getElementById('copied');
+  function select() { var r = document.createRange(); r.selectNodeContents(code); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  function done(msg) { note.textContent = msg; b.textContent = 'Copy again'; }
+  b.addEventListener('click', function () {
+    var text = code.textContent;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done('Copied. Paste it into a message.'); }, fallback);
+    } else fallback();
+    function fallback() {
+      select(); var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      done(ok ? 'Copied. Paste it into a message.' : 'Selected. Press Cmd+C (or Ctrl+C) to copy.');
+    }
+  });
+  b.focus();
+})();
+"""
 
 
 class AdminHandler(BaseHTTPRequestHandler):
@@ -648,15 +673,21 @@ class AdminHandler(BaseHTTPRequestHandler):
         return hmac.new(STORE.secret.encode(), b"admin-csrf", hashlib.sha256).hexdigest()[:32]
 
     def send_html(self, status, body):
+        nonce = secrets.token_urlsafe(16)
         data = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OnceGate</title><style>{ADMIN_CSS}</style></head><body><div class="wrap">{body}</div></body></html>""".encode()
+<title>OnceGate</title><style>{ADMIN_CSS}</style></head><body><div class="wrap">{body}</div>
+<script nonce="{nonce}">{ADMIN_JS}</script></body></html>""".encode()
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         for k, v in SECURITY_HEADERS.items():
-            # "no-referrer" makes browsers send Origin: null on form posts, which the
-            # cross-site check would reject; same-origin keeps the admin's own origin visible.
-            self.send_header(k, "same-origin" if k == "Referrer-Policy" else v)
+            if k == "Referrer-Policy":
+                # "no-referrer" makes browsers send Origin: null on form posts, which the
+                # cross-site check would reject; same-origin keeps the admin's own origin visible.
+                v = "same-origin"
+            elif k == "Content-Security-Policy":
+                v = v.replace("default-src 'none';", f"default-src 'none'; script-src 'nonce-{nonce}';")
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
 
@@ -763,7 +794,8 @@ class AdminHandler(BaseHTTPRequestHandler):
         if error:
             out.append(f"<div class='card' style='color:var(--bad)'>{esc(error)}</div>")
         if new:
-            out.append(f"<div class='card new-link'><b>Link for {esc(new[0])}, works once:</b><code>{esc(new[1])}</code>"
+            out.append(f"<div class='card new-link'><b>Link for {esc(new[0])}, works once:</b><code id='newlink'>{esc(new[1])}</code>"
+                       "<div class='row'><button type='button' id='copylink'>Copy link</button><span id='copied' class='sub' aria-live='polite'></span></div>"
                        "<small>Copy it now. For safety only a fingerprint of it is stored, so it can't be shown again.</small></div>")
         out.append(f"""<div class="card"><h2>New single-use link</h2>
 <form class="new" method="post" action="/invite"><input type="hidden" name="csrf" value="{csrf}">

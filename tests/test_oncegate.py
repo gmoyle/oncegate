@@ -225,7 +225,10 @@ class OnceGateTest(unittest.TestCase):
                            headers={"Authorization": good, "Content-Type": "application/x-www-form-urlencoded",
                                     "Content-Length": str(len(form))})
         self.assertEqual(r.status, 200)
-        link = re.search(rb"<code>(/_once/[A-Za-z0-9_-]+)</code>", body).group(1).decode()
+        link = re.search(rb"<code id='newlink'>(/_once/[A-Za-z0-9_-]+)</code>", body).group(1).decode()
+        self.assertIn(b"id='copylink'", body)                  # a Copy link button next to the new link
+        nonce = re.search(r"script-src 'nonce-([^']+)'", r.getheader("Content-Security-Policy")).group(1)
+        self.assertIn(('<script nonce="%s">' % nonce).encode(), body)   # only our own script may run
         r, _ = self.req("GET", link)
         self.assertEqual(r.status, 200)
 

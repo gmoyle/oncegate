@@ -96,7 +96,7 @@ Open `http://<server>:9098` from your home network and sign in with the admin pa
 
 1. Under **New single-use link**, type who it's for (shown to them as "Hi Lily"), an optional
    session length in hours, and an optional note for yourself.
-2. Click **Create link** and copy it. **It's shown once.** Only a fingerprint is stored, so it can't
+2. Click **Create link**, then **Copy link**. **It's shown once.** Only a fingerprint is stored, so it can't
    be displayed again; if you lose it, cancel it and make another.
 3. Send it however you like: text, email, chat.
 
