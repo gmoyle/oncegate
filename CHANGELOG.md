@@ -2,6 +2,14 @@
 
 All notable changes to OnceGate. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-11-25
+
+### Added
+
+- **Show note to the guest**: a tick box next to the note on the admin page (`--show-note` on the
+  command line). When ticked, the note appears under "Hi <name>" on the link page, as plain text.
+  Notes stay private by default, and the admin list marks the ones guests can see.
+
 ## [0.1.1] - 2026-11-25
 
 ### Added
@@ -31,5 +39,6 @@ First release.
 - Container image (non-root, health check) for amd64, arm64 and armv7.
 - Guides for Tailscale Funnel, reverse proxies, NAS platforms and troubleshooting.
 
+[0.1.2]: https://github.com/gmoyle/oncegate/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gmoyle/oncegate/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gmoyle/oncegate/releases/tag/v0.1.0

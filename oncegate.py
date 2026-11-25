@@ -160,7 +160,7 @@ class Store:
         return self.data["secret"]
 
     # ---- invites ----
-    def create_invite(self, label, session_hours=None, note="", invite_days=None):
+    def create_invite(self, label, session_hours=None, note="", invite_days=None, show_note=False):
         label = (label or "Guest").strip()[:60] or "Guest"
         note = (note or "").strip()[:200]
         hours = CFG.session_hours if session_hours in (None, "") else float(session_hours)
@@ -171,7 +171,7 @@ class Store:
         self.refresh()
         with _lock:
             self.data["invites"][iid] = {
-                "hash": _hash(code), "label": label, "note": note, "sessionHours": hours,
+                "hash": _hash(code), "label": label, "note": note, "showNote": bool(show_note and note), "sessionHours": hours,
                 "created": _now(), "expires": (_now() + int(days * 86400)) if days > 0 else None,
                 "usedAt": None, "usedIp": None, "revoked": False,
             }
@@ -329,7 +329,16 @@ h1{{margin:0;font-size:1.6rem;line-height:1.2}}p{{margin:0;color:var(--muted)}}
 button,.btn{{font:600 1rem system-ui,sans-serif;border:0;border-radius:12px;padding:13px 18px;background:var(--accent);color:#1b1407;cursor:pointer;width:100%}}
 .tag{{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}}
 .bad{{color:var(--bad)}}small{{color:var(--muted)}}
+.note{{margin:0;padding:12px 14px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 10px 10px 0;color:var(--ink);white-space:pre-line;overflow-wrap:anywhere}}
 </style></head><body><main class="card">{body}</main></body></html>"""
+
+
+def guest_note(inv):
+    """The link's note, shown to the guest only when the admin chose to share it."""
+    note = (inv.get("note") or "").strip()
+    if not (inv.get("showNote") and note):
+        return ""
+    return f'\n<p class="note">{esc(note)}</p>'
 
 
 SECURITY_HEADERS = {
@@ -464,7 +473,7 @@ class PublicHandler(BaseHTTPRequestHandler):
             dur = fmt_duration(inv["sessionHours"])
             return self.send_page(200, CFG.title, f"""
 <span class="tag">{esc(CFG.title)}</span>
-<h1>Hi {esc(inv['label'])}</h1>
+<h1>Hi {esc(inv['label'])}</h1>{guest_note(inv)}
 <p>This link works once. Tap the button to open the site on this device for {esc(dur)}.</p>
 <form method="post"><button type="submit">Open the site</button></form>
 <small>Don't forward this link; once it's used it stops working.</small>""")
@@ -585,6 +594,7 @@ h1{margin:0 0 4px;font-size:1.6rem}h2{font-size:1.1rem;margin:0 0 10px}p.sub{col
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;overflow-x:auto}
 form.new{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));align-items:end}
 label{display:grid;gap:4px;font-size:.8rem;color:var(--muted);font-weight:600}
+label.check{display:flex;gap:8px;align-items:center;padding-bottom:9px}label.check input{width:auto;margin:0}
 input{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 button{font:600 .9rem system-ui,sans-serif;border:0;border-radius:9px;padding:9px 14px;background:var(--accent);color:#fff;cursor:pointer}
 button.x{background:transparent;color:var(--bad);border:1px solid var(--line);padding:4px 10px;font-size:.8rem}
@@ -762,7 +772,8 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path == "/invite":
             try:
-                iid, code = STORE.create_invite(f.get("label"), f.get("hours") or None, f.get("note"))
+                iid, code = STORE.create_invite(f.get("label"), f.get("hours") or None, f.get("note"),
+                                               show_note=f.get("show_note") == "1")
             except ValueError:
                 return self.render(error="Session length must be a number of hours.")
             return self.render(new=(f.get("label") or "Guest", invite_url(code)))
@@ -802,6 +813,7 @@ class AdminHandler(BaseHTTPRequestHandler):
 <label>Who is it for<input name="label" maxlength="60" placeholder="e.g. Lily" required></label>
 <label>Session length (hours)<input name="hours" inputmode="decimal" placeholder="{CFG.session_hours:g}"></label>
 <label>Note<input name="note" maxlength="200" placeholder="optional"></label>
+<label class="check"><input type="checkbox" name="show_note" value="1"> Show note to the guest</label>
 <button type="submit">Create link</button></form></div>""")
         with _lock:
             invites = sorted(STORE.data["invites"].items(), key=lambda kv: -kv[1]["created"])
@@ -812,7 +824,8 @@ class AdminHandler(BaseHTTPRequestHandler):
             btn = (f"<form method='post' action='/revoke'><input type='hidden' name='csrf' value='{csrf}'>"
                    f"<input type='hidden' name='kind' value='invite'><input type='hidden' name='id' value='{esc(iid)}'>"
                    "<button class='x'>Cancel</button></form>") if st == "ready" else ""
-            rows.append(f"<tr><td><b>{esc(inv['label'])}</b><br><small>{esc(inv.get('note') or '')}</small></td>"
+            shown = " <span class='pill'>shown to guest</span>" if inv.get("showNote") and inv.get("note") else ""
+            rows.append(f"<tr><td><b>{esc(inv['label'])}</b><br><small>{esc(inv.get('note') or '')}</small>{shown}</td>"
                         f"<td><span class='pill {st}'>{st}</span></td><td>{fmt_time(inv['created'])}</td>"
                         f"<td>{fmt_time(inv.get('usedAt'))}<br><small>{esc(inv.get('usedIp') or '')}</small></td>"
                         f"<td>{inv['sessionHours']:g} h</td><td>{btn}</td></tr>")
@@ -861,6 +874,7 @@ def cli(argv):
     inv.add_argument("--label", default="Guest")
     inv.add_argument("--hours", type=float)
     inv.add_argument("--note", default="")
+    inv.add_argument("--show-note", action="store_true", help="show the note to the guest on the link page")
     sub.add_parser("list", help="list links and sessions")
     rv = sub.add_parser("revoke", help="cancel a link or end a session by id")
     rv.add_argument("id")
@@ -870,7 +884,7 @@ def cli(argv):
     if a.cmd in (None, "serve"):
         return serve()
     if a.cmd == "invite":
-        _, code = STORE.create_invite(a.label, a.hours, a.note)
+        _, code = STORE.create_invite(a.label, a.hours, a.note, show_note=a.show_note)
         print(invite_url(code))
         return 0
     if a.cmd == "list":

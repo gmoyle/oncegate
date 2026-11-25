@@ -40,7 +40,7 @@ button does, and bots don't press buttons.
   "secret": "…random, signs admin form tokens…",
   "invites": {
     "1a2b3c4d5e6f": {
-      "hash": "sha256 of the code", "label": "Lily", "note": "hotel wifi",
+      "hash": "sha256 of the code", "label": "Lily", "note": "hotel wifi", "showNote": false,
       "sessionHours": 4, "created": 1795567000, "expires": null,
       "usedAt": 1795567600, "usedIp": "203.0.113.7", "revoked": false
     }

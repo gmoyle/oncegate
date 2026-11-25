@@ -183,6 +183,19 @@ class OnceGateTest(unittest.TestCase):
         _, code = other.create_invite("CLI", 1, "")
         self.redeem(code)
 
+    def test_note_shown_to_guest_only_when_chosen(self):
+        _, private = self.og.STORE.create_invite("Lily", 2, "for my eyes only")
+        r, body = self.req("GET", "/_once/" + private)
+        self.assertEqual(r.status, 200)
+        self.assertNotIn(b"for my eyes only", body)            # notes are private by default
+        _, shared = self.og.STORE.create_invite("Lily", 2, "Photos from <b>the weekend</b>", show_note=True)
+        r, body = self.req("GET", "/_once/" + shared)
+        self.assertIn(b'class="note"', body)
+        self.assertIn(b"Photos from &lt;b&gt;the weekend&lt;/b&gt;", body)   # plain text, never markup
+        _, empty = self.og.STORE.create_invite("Lily", 2, "  ", show_note=True)
+        r, body = self.req("GET", "/_once/" + empty)
+        self.assertNotIn(b'class="note"', body)                 # nothing to show, no empty box
+
     def test_codes_not_stored_in_clear(self):
         code = self.new_code()
         with open(self.og.STORE.path) as f:
@@ -229,8 +242,18 @@ class OnceGateTest(unittest.TestCase):
         self.assertIn(b"id='copylink'", body)                  # a Copy link button next to the new link
         nonce = re.search(r"script-src 'nonce-([^']+)'", r.getheader("Content-Security-Policy")).group(1)
         self.assertIn(('<script nonce="%s">' % nonce).encode(), body)   # only our own script may run
-        r, _ = self.req("GET", link)
+        r, body = self.req("GET", link)
         self.assertEqual(r.status, 200)
+        self.assertNotIn(b"hotel", body)                        # note stays private without the tick box
+        form = "label=Sam&note=Welcome+home&show_note=1&csrf=" + csrf
+        r, body = self.req("POST", "/invite", port=port, body=form,
+                           headers={"Authorization": good, "Content-Type": "application/x-www-form-urlencoded",
+                                    "Content-Length": str(len(form))})
+        link = re.search(rb"<code id='newlink'>(/_once/[A-Za-z0-9_-]+)</code>", body).group(1).decode()
+        r, body = self.req("GET", link)
+        self.assertIn(b"Welcome home", body)
+        r, body = self.req("GET", "/", port=port, headers={"Authorization": good})
+        self.assertIn(b"shown to guest", body)
 
 
 if __name__ == "__main__":

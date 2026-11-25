@@ -95,7 +95,10 @@ No Docker? `python3 oncegate.py serve` with the same environment variables works
 Open `http://<server>:9098` from your home network and sign in with the admin password.
 
 1. Under **New single-use link**, type who it's for (shown to them as "Hi Lily"), an optional
-   session length in hours, and an optional note for yourself.
+   session length in hours, and an optional note. The note is for you unless you tick
+   **Show note to the guest**; then it appears under "Hi Lily" on the link page as plain text.
+   Anyone holding the link can read it before using it, including message-app previews, so keep
+   shared notes friendly rather than private.
 2. Click **Create link**, then **Copy link**. **It's shown once.** Only a fingerprint is stored, so it can't
    be displayed again; if you lose it, cancel it and make another.
 3. Send it however you like: text, email, chat.
@@ -125,7 +128,7 @@ docker exec oncegate python /app/oncegate.py revoke 1a2b3c4d5e6f
 | Command | Does |
 |---|---|
 | `serve` | Run the gate (the default) |
-| `invite --label NAME [--hours H] [--note TEXT]` | Create a link and print it |
+| `invite --label NAME [--hours H] [--note TEXT] [--show-note]` | Create a link and print it; `--show-note` shows the note to the guest |
 | `list` | Show links and sessions with their ids and states |
 | `revoke ID` | Cancel a link or end a session |
 
